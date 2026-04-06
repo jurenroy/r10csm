@@ -186,14 +186,16 @@ class AuthenticatedController extends Controller
     // Retrieve survey logs base on the sqd, year and service
     public function get_survey_logs($service_id, $sqd, $year) {
         $datapoints = SurveyLog::select(
-                                        DB::raw("SUM(sqd$sqd) as sqd"),
-                                        DB::raw('MONTH(created_at) as month')
+                                        DB::raw("SUM(sqd$sqd) as sqd_sum"),    // total sum
+                                        DB::raw("COUNT(*) as count"),          // number of records
+                                        DB::raw("SUM(sqd$sqd)/COUNT(*) as sqd_avg"), // average
+                                        DB::raw("MONTH(created_at) as month")  // month number
                                     )
                                 ->where('service_id', $service_id)
                                 ->whereYear('created_at', $year)
                                 ->groupBy(DB::raw('MONTH(created_at)'))
                                 ->get();
-
+    
         return response()->json([
             'datapoints' => $datapoints,
         ]);

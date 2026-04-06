@@ -1,13 +1,12 @@
 @extends('base')
 
 @section('title', 'CSM | ' . $service->service_name )
-
 @section('page_title', $service->service_name)
 
 @section('page_custom_css')
 <style>
     .chart_canvass {
-        min-height: 400; 
+        min-height: 400px; 
         height: 400px; 
         max-height: 400px; 
         max-width: 100%;
@@ -18,7 +17,7 @@
 @section('site_map')
 <ol class="breadcrumb float-sm-right">
     <li class="breadcrumb-item"><a href="#">Home</a></li>
-    <li class="breadcrumb-item ">Dashboard</li>
+    <li class="breadcrumb-item">Dashboard</li>
     <li class="breadcrumb-item active">{{ $service->service_name }}</li>
 </ol>
 @endsection
@@ -26,21 +25,18 @@
 @section('content')
 <div class="row">
     <div class="col-12">
-        <a href="{{ url()->previous() }}" class="mb-2 btn btn-warning font-weight-bold"><i class="fa fa-arrow-left"></i> Return</a>
+        <a href="{{ url()->previous() }}" class="mb-2 btn btn-warning font-weight-bold">
+            <i class="fa fa-arrow-left"></i> Return
+        </a>
         <div class="card p-2">
             <div class="row">
                 <div class="col-md-3">
                     <div class="form-group form-inline">
                         <label class="mr-2">Service Quality Dimension (SQD)</label>
                         <select class="form-control input-lg" name="sqd" id="sqd">
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
-                            <option value="5">5</option>
-                            <option value="6">6</option>
-                            <option value="7">7</option>
-                            <option value="8">8</option>
+                            @for ($i = 1; $i <= 8; $i++)
+                                <option value="{{ $i }}">{{ $i }}</option>
+                            @endfor
                         </select>
                     </div>
                 </div>
@@ -50,7 +46,7 @@
                         <label class="mr-2">Year</label>
                         <select class="form-control input-lg" name="year" id="year">
                             @foreach ($years as $year)
-                                <option value="{{ $year->year }}" @if($year->year == now()->year) selected @endif >{{ $year->year }}</option>
+                                <option value="{{ $year->year }}" @if($year->year == now()->year) selected @endif>{{ $year->year }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -66,143 +62,108 @@
 @endsection
 
 @section('page_custom_script')
-<script>
-    $(function () {
-        // Bar Chart
-        // Get canvas
-        var barChartCanvas = $('#service').get(0).getContext('2d');
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Chart.js Data Labels plugin -->
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 
-        // Set options
-        var barChartOptions = {
-            responsive              : true,
-            maintainAspectRatio     : false,
+<script>
+$(function () {
+    const ctx = $('#service').get(0).getContext('2d');
+
+    const monthLabels = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+
+    let responseCounts = Array(12).fill(0);
+    let averageRatings = Array(12).fill(0);
+
+    const serviceChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: monthLabels,
+            datasets: [{
+                label: 'Total Ratings',
+                backgroundColor: 'rgba(60,141,188,0.9)',
+                borderColor: 'rgba(60,141,188,0.8)',
+                borderWidth: 1,
+                data: Array(12).fill(0)
+            }]
+        },
+        plugins: [ChartDataLabels],
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
             scales: {
-                yAxes: [{
-                    ticks: {
-                        min: 0,
-                        beginAtZero: true,
-                        stepSize: 1
+                y: {
+                    beginAtZero: true,
+                    ticks: { stepSize: 1 }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const index = context.dataIndex;
+                            const total = context.dataset.data[index] || 0;
+                            const count = responseCounts[index] || 0;
+                            const avg = averageRatings[index] || 0;
+                            return `Total: ${total.toFixed(2)} | Responses: ${count} | Average: ${avg.toFixed(2)}`;
+                        }
                     }
-                }]
+                },
+                // datalabels: {
+                //     anchor: 'end',
+                //     align: 'end',
+                //     color: '#000',
+                //     font: { weight: 'bold' },
+                //     formatter: function(value, context) {
+                //         const index = context.dataIndex;
+                //         const count = responseCounts[index] || 0;
+                //         const avg = averageRatings[index] || 0;
+                //         return `Sum: ${value.toFixed(2)}\nCount: ${count}\nAvg: ${avg.toFixed(2)}`;
+                //     }
+                // }
             }
         }
+    });
 
-        // Initialize the chart
-        var serviceChart = new Chart(barChartCanvas, {
-            type: 'bar',
-            data: [],
-            options: barChartOptions
-        })
+    function loadChartData() {
+        const sqd = $('#sqd').val();
+        const year = $('#year').val();
 
         $.ajax({
-            url: "{{ url('service_details') }}/{{ $id }}/" + $('#sqd').val() + "/" + $('#year').val(),
+            url: "{{ url('service_details') }}/{{ $id }}/" + sqd + "/" + year,
             type: "GET",
+            dataType: "json",
             success: function(response) {
-                const data = response.datapoints.map(function(index) {
-                    return index.sqd;
+                const totals = Array(12).fill(0);
+                responseCounts = Array(12).fill(0);
+                averageRatings = Array(12).fill(0);
+
+                response.datapoints.forEach(dp => {
+                    const monthIndex = dp.month - 1;
+                    totals[monthIndex] = parseFloat(dp.sqd_sum) || 0;
+                    responseCounts[monthIndex] = parseInt(dp.count) || 0;
+                    averageRatings[monthIndex] = parseFloat(dp.sqd_avg) || 0;
                 });
 
-                // Get data
-                var barChartData = {
-                    labels  : ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
-                    datasets: [
-                        {
-                        label               : 'Rating',
-                        backgroundColor     : 'rgba(60,141,188,0.9)',
-                        borderColor         : 'rgba(60,141,188,0.8)',
-                        pointRadius          : false,
-                        pointColor          : '#3b8bba',
-                        pointStrokeColor    : 'rgba(60,141,188,1)',
-                        pointHighlightFill  : '#fff',
-                        pointHighlightStroke: 'rgba(60,141,188,1)',
-                        data                : data
-                        },
-                    ]
-                }
-
-                // Load data
-                serviceChart.data = barChartData;
+                serviceChart.data.datasets[0].data = totals;
                 serviceChart.update();
             },
-            error: function(xhr, errorStatus, error) {
-                console.log(error)
+            error: function(xhr, status, error) {
+                console.error("Error loading chart data:", error);
+                serviceChart.data.datasets[0].data = Array(12).fill(0);
+                responseCounts = Array(12).fill(0);
+                averageRatings = Array(12).fill(0);
+                serviceChart.update();
             }
-        })
+        });
+    }
 
-        // Make AJAX call everytime the parameter change
-        $('#sqd').on('change', function() {
-            $.ajax({
-                url: "{{ url('service_details') }}/{{ $id }}/" + $('#sqd').val() + "/" + $('#year').val(),
-                type: "GET",
-                success: function(response) {
-                    const data = response.datapoints.map(function(index) {
-                        return index.sqd;
-                    });
-
-                    // Get data
-                    var barChartData = {
-                        labels  : ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
-                        datasets: [
-                            {
-                            label               : 'Rating',
-                            backgroundColor     : 'rgba(60,141,188,0.9)',
-                            borderColor         : 'rgba(60,141,188,0.8)',
-                            pointRadius          : false,
-                            pointColor          : '#3b8bba',
-                            pointStrokeColor    : 'rgba(60,141,188,1)',
-                            pointHighlightFill  : '#fff',
-                            pointHighlightStroke: 'rgba(60,141,188,1)',
-                            data                : data
-                            },
-                        ]
-                    }
-
-                    // Load data
-                    serviceChart.data = barChartData;
-                    serviceChart.update();
-                },
-                error: function(xhr, errorStatus, error) {
-                    console.log(error)
-                }
-            })
-        })
-
-        $('#year').on('change', function() {
-            $.ajax({
-                url: "{{ url('service_details') }}/{{ $id }}/" + $('#sqd').val() + "/" + $('#year').val(),
-                type: "GET",
-                success: function(response) {
-                    const data = response.datapoints.map(function(index) {
-                        return index.sqd;
-                    });
-
-                    // Get data
-                    var barChartData = {
-                        labels  : ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
-                        datasets: [
-                            {
-                            label               : 'Rating',
-                            backgroundColor     : 'rgba(60,141,188,0.9)',
-                            borderColor         : 'rgba(60,141,188,0.8)',
-                            pointRadius          : false,
-                            pointColor          : '#3b8bba',
-                            pointStrokeColor    : 'rgba(60,141,188,1)',
-                            pointHighlightFill  : '#fff',
-                            pointHighlightStroke: 'rgba(60,141,188,1)',
-                            data                : data
-                            },
-                        ]
-                    }
-
-                    // Load data
-                    serviceChart.data = barChartData;
-                    serviceChart.update();
-                },
-                error: function(xhr, errorStatus, error) {
-                    console.log(error)
-                }
-            })
-        })
-    })
+    loadChartData();
+    $('#sqd, #year').on('change', loadChartData);
+});
 </script>
 @endsection

@@ -43,5 +43,6 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('service/{id}/delete', [AuthenticatedController::class, 'delete_service'])->name('services.delete_service');
     Route::get('service/{id}', [AuthenticatedController::class, 'service_detail'])->name('services.service_detail');
     Route::get('service_details/{service_id}/{sqd}/{year}', [AuthenticatedController::class, 'get_survey_logs'])->name('service.get_survey_logs');
+    Route::get('/survey-logs', [SurveyController::class, 'index'])->name('survey_logs.index');
 });
 

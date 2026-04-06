@@ -96,13 +96,42 @@ class SurveyController extends Controller
     public function show_response($control_no)
     {
         $survey = SurveyLog::where('control_no', $control_no)->firstOrFail();
-    
+
         // Just pass the URL to Blade
         $qrUrl = route('survey.show_response', $control_no);
-    
+
         return view('survey-response', [
             'survey' => $survey,
             'qrUrl'  => $qrUrl
         ]);
     }
+
+    // Show all survey logs with optional filtering
+public function index(Request $request)
+{
+    $query = SurveyLog::query();
+
+    // Filter by year
+    if ($request->year) {
+        $query->whereYear('created_at', $request->year);
+    }
+
+    // Filter by month
+    if ($request->month) {
+        $query->whereMonth('created_at', $request->month);
+    }
+
+    // Filter by service_id
+    if ($request->service_id) {
+        $query->where('service_id', $request->service_id);
+    }
+
+    // Paginate results
+    $surveyLogs = $query->paginate(20);
+
+    // Pass available services for the dropdown
+    $serviceIds = Service::all();
+
+    return view('survey_logs.index', compact('surveyLogs', 'serviceIds'));
+}
 }
