@@ -18,6 +18,8 @@ use App\Http\Controllers\SurveyController;
 
 Route::get('/', [SurveyController::class, 'survey_view'])->name('survey.survey_view');
 Route::post('/', [SurveyController::class, 'save_survey_answer'])->name('survey.save_survey_answer');
+Route::get('response/{control_no}', [SurveyController::class, 'show_response'])
+     ->name('survey.show_response');
 
 // Authentication Routes
 Route::middleware(['guest'])->group(function() {
@@ -26,7 +28,7 @@ Route::middleware(['guest'])->group(function() {
 });
 
 Route::get('logout', [AuthenticationController::class, 'logout'])->name('logout');
-
+Route::post('/register', [AuthenticationController::class, 'register']);
 
 // Authenticated Users Routes
 Route::middleware(['auth'])->group(function () {
